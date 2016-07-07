@@ -35,9 +35,13 @@ var timeout = flag.Duration(
 
 func main() {
 	flag.Parse()
+	// flag.Parse will fail with exit code 2 if failure to parse
+	// failHealthCheck(1, "failure to parse flags")
 
 	interfaces, err := net.Interfaces()
-	if err == nil {
+	if err != nil {
+		failHealthCheck(1, "failure to get interfaces")
+	} else {
 		for _, intf := range interfaces {
 			addrs, err := intf.Addrs()
 			if err != nil {
@@ -55,10 +59,8 @@ func main() {
 				}
 			}
 		}
+		failHealthCheck(3, "failure to find suitable interface")
 	}
-
-	fmt.Println("healthcheck failed")
-	os.Exit(1)
 }
 
 func portHealthCheck(ip string) {
@@ -68,6 +70,12 @@ func portHealthCheck(ip string) {
 		conn.Close()
 		fmt.Println("healthcheck passed")
 		os.Exit(0)
+	} else {
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			failHealthCheck(64, "timeout when making tcp connection")
+		} else {
+			failHealthCheck(4, "failure to make TCP request")
+		}
 	}
 }
 
@@ -81,6 +89,19 @@ func httpHealthCheck(ip string) {
 		if resp.StatusCode == http.StatusOK {
 			fmt.Println("healthcheck passed")
 			os.Exit(0)
+		} else {
+			failHealthCheck(6, "failure to get valid HTTP status code")
+		}
+	} else {
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			failHealthCheck(65, "timeout when making HTTP request")
+		} else {
+			failHealthCheck(5, "failure to make HTTP request")
 		}
 	}
+}
+
+func failHealthCheck(code int, reason string) {
+	fmt.Println("healthcheck failed: " + reason)
+	os.Exit(code)
 }
