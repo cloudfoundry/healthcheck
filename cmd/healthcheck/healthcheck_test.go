@@ -47,14 +47,19 @@ var _ = Describe("HealthCheck", func() {
 	})
 
 	Describe("port healthcheck", func() {
-		portHealthCheck := func() *gexec.Session {
-			_, port, err := net.SplitHostPort(serverAddr)
-			Expect(err).NotTo(HaveOccurred())
+		var port string
+		var err error
 
+		portHealthCheck := func() *gexec.Session {
 			session, err := gexec.Start(exec.Command(healthCheck, "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 			return session
 		}
+
+		BeforeEach(func() {
+			_, port, err = net.SplitHostPort(serverAddr)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		Context("when the address is listening", func() {
 			itExitsWithCode(portHealthCheck, 0, "healthcheck passed")
@@ -62,25 +67,39 @@ var _ = Describe("HealthCheck", func() {
 
 		Context("when the address is not listening", func() {
 			BeforeEach(func() {
-				server.Close()
-				Eventually(func() error {
-					_, err := net.Dial("tcp", serverAddr)
-					return err
-				}).Should(HaveOccurred())
+				port = "-1"
 			})
 
-			itExitsWithCode(portHealthCheck, 4, "failure to make TCP request")
+			itExitsWithCode(portHealthCheck, 4, "failure to make TCP connection")
+		})
+
+		Context("when the server is slow in responding", func() {
+			BeforeEach(func() {
+				server.Close()
+				// Eventually(func() error {
+				// 	_, err := net.Dial("tcp", serverAddr)
+				// 	return err
+				// }).Should(HaveOccurred())
+			})
+
+			itExitsWithCode(portHealthCheck, 64, "timeout when making TCP connection")
 		})
 	})
 
 	Describe("http healthcheck", func() {
+		var port string
+		var err error
+
 		httpHealthCheck := func() *gexec.Session {
-			_, port, err := net.SplitHostPort(serverAddr)
-			Expect(err).NotTo(HaveOccurred())
 			session, err := gexec.Start(exec.Command(healthCheck, "-uri", "/api/_ping", "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 			return session
 		}
+
+		BeforeEach(func() {
+			_, port, err = net.SplitHostPort(serverAddr)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		Context("when the healthcheck is properly invoked", func() {
 			BeforeEach(func() {
@@ -96,7 +115,15 @@ var _ = Describe("HealthCheck", func() {
 					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(500, ""))
 				})
 
-				itExitsWithCode(httpHealthCheck, 6, "failure to get valid HTTP status code")
+				itExitsWithCode(httpHealthCheck, 6, "failure to get valid HTTP status code: 500")
+			})
+
+			Context("when the address is not listening", func() {
+				BeforeEach(func() {
+					port = "-1"
+				})
+
+				itExitsWithCode(httpHealthCheck, 5, "failure to make HTTP request")
 			})
 
 			Context("when the address is not listening", func() {
@@ -104,7 +131,7 @@ var _ = Describe("HealthCheck", func() {
 					server.Close()
 				})
 
-				itExitsWithCode(httpHealthCheck, 5, "failure to make HTTP request")
+				itExitsWithCode(httpHealthCheck, 65, "timeout when making HTTP request")
 			})
 
 			Context("when the server is too slow to respond", func() {
