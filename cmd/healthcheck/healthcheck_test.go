@@ -2,10 +2,8 @@ package main_test
 
 import (
 	"net"
-	"net/http"
 	"os/exec"
 	"strconv"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -72,18 +70,6 @@ var _ = Describe("HealthCheck", func() {
 
 			itExitsWithCode(portHealthCheck, 4, "failure to make TCP connection")
 		})
-
-		Context("when the server is slow in responding", func() {
-			BeforeEach(func() {
-				server.Close()
-				// Eventually(func() error {
-				// 	_, err := net.Dial("tcp", serverAddr)
-				// 	return err
-				// }).Should(HaveOccurred())
-			})
-
-			itExitsWithCode(portHealthCheck, 64, "timeout when making TCP connection")
-		})
 	})
 
 	Describe("http healthcheck", func() {
@@ -116,33 +102,6 @@ var _ = Describe("HealthCheck", func() {
 				})
 
 				itExitsWithCode(httpHealthCheck, 6, "failure to get valid HTTP status code: 500")
-			})
-
-			Context("when the address is not listening", func() {
-				BeforeEach(func() {
-					port = "-1"
-				})
-
-				itExitsWithCode(httpHealthCheck, 5, "failure to make HTTP request")
-			})
-
-			Context("when the address is not listening", func() {
-				BeforeEach(func() {
-					server.Close()
-				})
-
-				itExitsWithCode(httpHealthCheck, 65, "timeout when making HTTP request")
-			})
-
-			Context("when the server is too slow to respond", func() {
-				BeforeEach(func() {
-					server.RouteToHandler("GET", "/api/_ping", func(w http.ResponseWriter, req *http.Request) {
-						time.Sleep(2 * time.Second)
-						w.WriteHeader(http.StatusOK)
-					})
-				})
-
-				itExitsWithCode(httpHealthCheck, 65, "timeout when making HTTP request")
 			})
 		})
 	})
