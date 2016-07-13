@@ -76,8 +76,7 @@ var _ = Describe("HealthCheck", func() {
 			Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
 
 			hErr := err.(healthcheck.HealthCheckError)
-			Expect(hErr.Code).To(Equal(4))
-			Expect(hErr.Message).To(ContainSubstring("failure to make TCP connection"))
+			Expect(hErr.Code).ToNot(Equal(3))
 		})
 
 		It("fails appropriately when there are no interfaces", func() {
