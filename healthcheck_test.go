@@ -14,7 +14,7 @@ import (
 
 var _ = Describe("HealthCheck", func() {
 	itReturnsHealthCheckError := func(healthCheck func() error, code int, reason string) {
-		It("returns healthcheck error with code "+strconv.Itoa(code)+" and logs reason", func() {
+		It("returns healthcheck error with code "+strconv.Itoa(code)+" with an appropriate message", func() {
 			err := healthCheck()
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
@@ -40,6 +40,7 @@ var _ = Describe("HealthCheck", func() {
 	BeforeEach(func() {
 		ip = getNonLoopbackIP()
 		server = ghttp.NewUnstartedServer()
+		server.RouteToHandler("GET", "/api/_ping", ghttp.VerifyRequest("GET", "/api/_ping"))
 		listener, err := net.Listen("tcp", ip+":0")
 		Expect(err).NotTo(HaveOccurred())
 
@@ -132,10 +133,6 @@ var _ = Describe("HealthCheck", func() {
 		})
 
 		Context("when the healthcheck is properly invoked", func() {
-			BeforeEach(func() {
-				server.RouteToHandler("GET", "/api/_ping", ghttp.VerifyRequest("GET", "/api/_ping"))
-			})
-
 			Context("when the address is listening", func() {
 				It("succeeds", func() {
 					Expect(httpHealthCheck()).To(Succeed())
