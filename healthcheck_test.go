@@ -77,6 +77,8 @@ var _ = Describe("HealthCheck", func() {
 			Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
 
 			hErr := err.(healthcheck.HealthCheckError)
+			// fails with different error codes on Linux (4) or OSX (64)
+			// check to see it was not the NO interfaces error (3)
 			Expect(hErr.Code).ToNot(Equal(3))
 		})
 
