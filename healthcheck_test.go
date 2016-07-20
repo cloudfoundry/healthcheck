@@ -2,6 +2,7 @@ package healthcheck_test
 
 import (
 	"net"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -30,9 +31,10 @@ var _ = Describe("HealthCheck", func() {
 
 		ip string
 
-		uri     string
-		port    string
-		timeout time.Duration
+		uri         string
+		port        string
+		timeout     time.Duration
+		serverDelay time.Duration
 
 		hc healthcheck.HealthCheck
 	)
@@ -40,11 +42,16 @@ var _ = Describe("HealthCheck", func() {
 	BeforeEach(func() {
 		ip = getNonLoopbackIP()
 		server = ghttp.NewUnstartedServer()
-		server.RouteToHandler("GET", "/api/_ping", ghttp.VerifyRequest("GET", "/api/_ping"))
+		server.RouteToHandler("GET", "/api/_ping",
+			func(http.ResponseWriter, *http.Request) {
+				time.Sleep(serverDelay)
+			})
+
 		listener, err := net.Listen("tcp", ip+":0")
 		Expect(err).NotTo(HaveOccurred())
 
 		timeout = 100 * time.Millisecond
+		serverDelay = 0
 
 		server.HTTPTestServer.Listener = listener
 		serverAddr = listener.Addr().String()
@@ -119,6 +126,7 @@ var _ = Describe("HealthCheck", func() {
 		Context("when the server is slow in responding", func() {
 			BeforeEach(func() {
 				timeout = time.Nanosecond
+				serverDelay = time.Second
 			})
 
 			itReturnsHealthCheckError(portHealthCheck, 64, "timeout when making TCP connection")
@@ -160,6 +168,7 @@ var _ = Describe("HealthCheck", func() {
 			Context("when the server is too slow to respond", func() {
 				BeforeEach(func() {
 					timeout = time.Nanosecond
+					serverDelay = time.Second
 				})
 
 				itReturnsHealthCheckError(httpHealthCheck, 65, "timeout when making HTTP request")
