@@ -42,10 +42,6 @@ var _ = Describe("HealthCheck", func() {
 	BeforeEach(func() {
 		ip = getNonLoopbackIP()
 		server = ghttp.NewUnstartedServer()
-		server.RouteToHandler("GET", "/api/_ping",
-			func(http.ResponseWriter, *http.Request) {
-				time.Sleep(serverDelay)
-			})
 
 		listener, err := net.Listen("tcp", ip+":0")
 		Expect(err).NotTo(HaveOccurred())
@@ -55,12 +51,17 @@ var _ = Describe("HealthCheck", func() {
 
 		server.HTTPTestServer.Listener = listener
 		serverAddr = listener.Addr().String()
-		server.Start()
 		_, port, err = net.SplitHostPort(serverAddr)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	JustBeforeEach(func() {
+		server.RouteToHandler("GET", "/api/_ping",
+			func(http.ResponseWriter, *http.Request) {
+				time.Sleep(serverDelay)
+			})
+		server.Start()
+
 		hc = healthcheck.NewHealthCheck("tcp", uri, port, timeout)
 	})
 
@@ -150,7 +151,7 @@ var _ = Describe("HealthCheck", func() {
 			})
 
 			Context("when the address returns error http code", func() {
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(500, ""))
 				})
 
