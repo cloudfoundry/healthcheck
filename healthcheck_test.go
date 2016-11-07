@@ -65,6 +65,13 @@ var _ = Describe("HealthCheck", func() {
 		hc = healthcheck.NewHealthCheck("tcp", uri, port, timeout)
 	})
 
+	AfterEach(func() {
+		if server != nil {
+			server.CloseClientConnections()
+			server.Close()
+		}
+	})
+
 	Describe("check interfaces", func() {
 		It("succeeds when there are healthy interfaces", func() {
 			interfaces, err := net.Interfaces()
@@ -74,20 +81,26 @@ var _ = Describe("HealthCheck", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("fails appropriately when there are unhealthy interfaces", func() {
-			server.Close()
+		Context("when the server is failing", func() {
+			AfterEach(func() {
+				server = nil
+			})
 
-			interfaces, err := net.Interfaces()
-			Expect(err).NotTo(HaveOccurred())
+			It("fails appropriately when there are unhealthy interfaces", func() {
+				server.Close()
 
-			err = hc.CheckInterfaces(interfaces)
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
+				interfaces, err := net.Interfaces()
+				Expect(err).NotTo(HaveOccurred())
 
-			hErr := err.(healthcheck.HealthCheckError)
-			// fails with different error codes on Linux (4) or OSX (64)
-			// check to see it was not the NO interfaces error (3)
-			Expect(hErr.Code).ToNot(Equal(3))
+				err = hc.CheckInterfaces(interfaces)
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
+
+				hErr := err.(healthcheck.HealthCheckError)
+				// fails with different error codes on Linux (4) or OSX (64)
+				// check to see it was not the NO interfaces error (3)
+				Expect(hErr.Code).ToNot(Equal(3))
+			})
 		})
 
 		It("fails appropriately when there are no interfaces", func() {
