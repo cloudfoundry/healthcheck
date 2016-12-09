@@ -1,9 +1,9 @@
-// +build !windows
-
 package main_test
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 
@@ -51,7 +51,12 @@ var _ = Describe("HealthCheck", func() {
 		var err error
 
 		portHealthCheck := func() *gexec.Session {
-			session, err := gexec.Start(exec.Command(healthCheck, "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
+			command := exec.Command(healthCheck, "-port", "8080", "-timeout", "100ms")
+			command.Env = append(
+				os.Environ(),
+				fmt.Sprintf(`CF_INSTANCE_PORTS=[{"external":%s,"internal":%s}]`, port, "8080"),
+			)
+			session, err := gexec.Start(command, GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 			return session
 		}
@@ -79,7 +84,12 @@ var _ = Describe("HealthCheck", func() {
 		var err error
 
 		httpHealthCheck := func() *gexec.Session {
-			session, err := gexec.Start(exec.Command(healthCheck, "-uri", "/api/_ping", "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
+			command := exec.Command(healthCheck, "-uri", "/api/_ping", "-port", "8080", "-timeout", "100ms")
+			command.Env = append(
+				os.Environ(),
+				fmt.Sprintf(`CF_INSTANCE_PORTS=[{"external":%s,"internal":%s}]`, port, "8080"),
+			)
+			session, err := gexec.Start(command, GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 			return session
 		}

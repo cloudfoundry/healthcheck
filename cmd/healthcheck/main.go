@@ -44,7 +44,7 @@ func main() {
 		return
 	}
 
-	h := healthcheck.NewHealthCheck(*network, *uri, *port, *timeout)
+	h := newHealthCheck(*network, *uri, *port, *timeout)
 	err = h.CheckInterfaces(interfaces)
 	if err == nil {
 		fmt.Println("healthcheck passed")
