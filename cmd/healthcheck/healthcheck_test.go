@@ -4,8 +4,11 @@ package main_test
 
 import (
 	"net"
+	"net/http"
 	"os/exec"
 	"strconv"
+	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,6 +21,8 @@ var _ = Describe("HealthCheck", func() {
 	var (
 		server     *ghttp.Server
 		serverAddr string
+		port       string
+		args       []string
 	)
 
 	itExitsWithCode := func(healthCheck func() *gexec.Session, code int, reason string) {
@@ -29,6 +34,8 @@ var _ = Describe("HealthCheck", func() {
 	}
 
 	BeforeEach(func() {
+		args = nil
+
 		ip := getNonLoopbackIP()
 		server = ghttp.NewUnstartedServer()
 		listener, err := net.Listen("tcp", ip+":0")
@@ -37,6 +44,9 @@ var _ = Describe("HealthCheck", func() {
 		server.HTTPTestServer.Listener = listener
 		serverAddr = listener.Addr().String()
 		server.Start()
+
+		_, port, err = net.SplitHostPort(serverAddr)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("fails when parsing flags", func() {
@@ -46,21 +56,92 @@ var _ = Describe("HealthCheck", func() {
 		})
 	})
 
-	Describe("port healthcheck", func() {
-		var port string
-		var err error
+	portHealthCheck := func() *gexec.Session {
+		args = append([]string{"-port", port, "-timeout", "100ms"}, args...)
+		session, err := gexec.Start(exec.Command(healthCheck, args...), GinkgoWriter, GinkgoWriter)
+		Expect(err).NotTo(HaveOccurred())
+		return session
+	}
 
-		portHealthCheck := func() *gexec.Session {
-			session, err := gexec.Start(exec.Command(healthCheck, "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
-			Expect(err).NotTo(HaveOccurred())
-			return session
-		}
+	httpHealthCheck := func() *gexec.Session {
+		args = append([]string{"-uri", "/api/_ping", "-port", port, "-timeout", "100ms"}, args...)
+		session, err := gexec.Start(exec.Command(healthCheck, args...), GinkgoWriter, GinkgoWriter)
+		Expect(err).NotTo(HaveOccurred())
+		return session
+	}
+
+	Describe("in readiness mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64 = http.StatusInternalServerError
+		)
 
 		BeforeEach(func() {
-			_, port, err = net.SplitHostPort(serverAddr)
-			Expect(err).NotTo(HaveOccurred())
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-readiness-interval=1s"}
 		})
 
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is started", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+			atomic.StoreInt64(&statusCode, http.StatusOK)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(0))
+		})
+
+		It("runs a healthcheck every readiness-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+	})
+
+	Describe("in liveness mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64 = http.StatusOK
+		)
+
+		BeforeEach(func() {
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-liveness-interval=1s"}
+		})
+
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is down", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
+			Expect(session.Out).To(gbytes.Say("failure to get valid HTTP status code: 500"))
+		})
+
+		It("runs a healthcheck every liveness-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+	})
+
+	Describe("port healthcheck", func() {
 		Context("when the address is listening", func() {
 			itExitsWithCode(portHealthCheck, 0, "healthcheck passed")
 		})
@@ -75,20 +156,6 @@ var _ = Describe("HealthCheck", func() {
 	})
 
 	Describe("http healthcheck", func() {
-		var port string
-		var err error
-
-		httpHealthCheck := func() *gexec.Session {
-			session, err := gexec.Start(exec.Command(healthCheck, "-uri", "/api/_ping", "-port", port, "-timeout", "100ms"), GinkgoWriter, GinkgoWriter)
-			Expect(err).NotTo(HaveOccurred())
-			return session
-		}
-
-		BeforeEach(func() {
-			_, port, err = net.SplitHostPort(serverAddr)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		Context("when the healthcheck is properly invoked", func() {
 			BeforeEach(func() {
 				server.RouteToHandler("GET", "/api/_ping", ghttp.VerifyRequest("GET", "/api/_ping"))

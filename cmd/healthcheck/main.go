@@ -34,6 +34,18 @@ var timeout = flag.Duration(
 	"dial timeout",
 )
 
+var readinessInterval = flag.Duration(
+	"readiness-interval",
+	0,
+	"if set, starts the healthcheck in readiness mode, i.e. do not exit until the healthcheck passes. runs checks every readiness-interval",
+)
+
+var livenessInterval = flag.Duration(
+	"liveness-interval",
+	0,
+	"if set, starts the healthcheck in liveness mode, i.e. do not exit until the healthcheck fail. runs checks every liveness-interval",
+)
+
 func main() {
 	flag.Parse()
 
@@ -45,11 +57,32 @@ func main() {
 	}
 
 	h := newHealthCheck(*network, *uri, *port, *timeout)
+
+	if readinessInterval != nil && *readinessInterval > 0 {
+		for {
+			err = h.CheckInterfaces(interfaces)
+			if err == nil {
+				fmt.Println("healthcheck passed")
+				os.Exit(0)
+			}
+			time.Sleep(*readinessInterval)
+		}
+	}
+
+	if livenessInterval != nil && *livenessInterval > 0 {
+		for {
+			err = h.CheckInterfaces(interfaces)
+			if err != nil {
+				failHealthCheck(err)
+			}
+			time.Sleep(*livenessInterval)
+		}
+	}
+
 	err = h.CheckInterfaces(interfaces)
 	if err == nil {
 		fmt.Println("healthcheck passed")
 		os.Exit(0)
-		return
 	}
 
 	failHealthCheck(err)
