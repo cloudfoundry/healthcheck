@@ -73,10 +73,11 @@ var _ = Describe("HealthCheck", func() {
 	Describe("in readiness mode", func() {
 		var (
 			session    *gexec.Session
-			statusCode int64 = http.StatusInternalServerError
+			statusCode int64
 		)
 
 		BeforeEach(func() {
+			statusCode = http.StatusInternalServerError
 			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 				statusCode := atomic.LoadInt64(&statusCode)
 				resp.WriteHeader(int(statusCode))
@@ -108,10 +109,11 @@ var _ = Describe("HealthCheck", func() {
 	Describe("in liveness mode", func() {
 		var (
 			session    *gexec.Session
-			statusCode int64 = http.StatusOK
+			statusCode int64
 		)
 
 		BeforeEach(func() {
+			statusCode = http.StatusOK
 			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 				statusCode := atomic.LoadInt64(&statusCode)
 				resp.WriteHeader(int(statusCode))
