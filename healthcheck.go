@@ -60,10 +60,11 @@ func (h *HealthCheck) PortHealthCheck(ip string) error {
 	}
 
 	if err, ok := err.(net.Error); ok && err.Timeout() {
-		return HealthCheckError{Code: 64, Message: fmt.Sprintf("timeout when making TCP connection: %s", err)}
+		msg := fmt.Sprintf("Failed to make TCP connection to port %s: timed out after %.2f seconds", h.port, h.timeout.Seconds())
+		return HealthCheckError{Code: 64, Message: msg}
 	}
 
-	return HealthCheckError{Code: 4, Message: fmt.Sprintf("failure to make TCP connection: %s", err)}
+	return HealthCheckError{Code: 4, Message: fmt.Sprintf("Failed to make TCP connection to port %s: connection refused", h.port)}
 }
 
 func (h *HealthCheck) HTTPHealthCheck(ip string) error {
@@ -71,7 +72,9 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 	client := http.Client{
 		Timeout: h.timeout,
 	}
+	now := time.Now()
 	resp, err := client.Get(addr)
+	dur := time.Since(now)
 	if err == nil {
 		defer resp.Body.Close()
 
@@ -84,12 +87,30 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 			return nil
 		}
 
-		return HealthCheckError{Code: 6, Message: fmt.Sprintf("failure to get valid HTTP status code: %d", resp.StatusCode)}
+		errMsg := fmt.Sprintf(
+			"Failed to make HTTP request to '%s' on port %s: received status code %d in %dms",
+			h.uri,
+			h.port,
+			resp.StatusCode,
+			dur.Nanoseconds()/time.Millisecond.Nanoseconds(),
+		)
+		return HealthCheckError{Code: 6, Message: errMsg}
 	}
 
 	if err, ok := err.(net.Error); ok && err.Timeout() {
-		return HealthCheckError{Code: 65, Message: fmt.Sprintf("timeout when making HTTP request: %s", err)}
+		errMsg := fmt.Sprintf(
+			"Failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
+			h.uri,
+			h.port,
+			h.timeout.Seconds(),
+		)
+		return HealthCheckError{Code: 65, Message: errMsg}
 	}
 
-	return HealthCheckError{Code: 5, Message: fmt.Sprintf("failure to make HTTP request: %s", err)}
+	errMsg := fmt.Sprintf(
+		"Failed to make HTTP request to '%s' on port %s: connection refused",
+		h.uri,
+		h.port,
+	)
+	return HealthCheckError{Code: 5, Message: errMsg}
 }

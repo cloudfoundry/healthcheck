@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"code.cloudfoundry.org/healthcheck"
@@ -59,13 +61,21 @@ func main() {
 	h := newHealthCheck(*network, *uri, *port, *timeout)
 
 	if readinessInterval != nil && *readinessInterval > 0 {
+		timer := time.NewTimer(*readinessInterval)
+		defer timer.Stop()
+		sigCh := make(chan os.Signal)
+		signal.Notify(sigCh, syscall.SIGTERM)
+
 		for {
 			err = h.CheckInterfaces(interfaces)
 			if err == nil {
-				fmt.Println("healthcheck passed")
 				os.Exit(0)
 			}
-			time.Sleep(*readinessInterval)
+			select {
+			case <-timer.C:
+			case <-sigCh:
+				failHealthCheck(err)
+			}
 		}
 	}
 
@@ -81,7 +91,6 @@ func main() {
 
 	err = h.CheckInterfaces(interfaces)
 	if err == nil {
-		fmt.Println("healthcheck passed")
 		os.Exit(0)
 	}
 
@@ -90,10 +99,10 @@ func main() {
 
 func failHealthCheck(err error) {
 	if err, ok := err.(healthcheck.HealthCheckError); ok {
-		fmt.Println("healthcheck failed: " + err.Message)
+		fmt.Print(err.Message)
 		os.Exit(err.Code)
 	}
 
-	fmt.Println("healthcheck failed(unknown error)" + err.Error())
+	fmt.Print("healthcheck failed(unknown error)" + err.Error())
 	os.Exit(127)
 }

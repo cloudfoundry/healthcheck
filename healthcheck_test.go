@@ -1,10 +1,10 @@
 package healthcheck_test
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 
 	"code.cloudfoundry.org/healthcheck"
@@ -16,14 +16,12 @@ import (
 
 var _ = Describe("HealthCheck", func() {
 	itReturnsHealthCheckError := func(healthCheck func() error, code int, reason string) {
-		It("returns healthcheck error with code "+strconv.Itoa(code)+" with an appropriate message", func() {
-			err := healthCheck()
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
-			hErr := err.(healthcheck.HealthCheckError)
-			Expect(hErr.Code).To(Equal(code))
-			Expect(hErr.Message).To(ContainSubstring(reason))
-		})
+		err := healthCheck()
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(BeAssignableToTypeOf(healthcheck.HealthCheckError{}))
+		hErr := err.(healthcheck.HealthCheckError)
+		Expect(hErr.Code).To(Equal(code))
+		Expect(hErr.Message).To(ContainSubstring(reason))
 	}
 
 	var (
@@ -132,10 +130,13 @@ var _ = Describe("HealthCheck", func() {
 
 		Context("when the address is not listening", func() {
 			BeforeEach(func() {
-				port = "-1"
+				port = "1"
 			})
 
-			itReturnsHealthCheckError(portHealthCheck, 4, "failure to make TCP connection")
+			It("returns healthcheck error with code 4 with an appropriate message", func() {
+				errMsg := "Failed to make TCP connection to port 1: connection refused"
+				itReturnsHealthCheckError(portHealthCheck, 4, errMsg)
+			})
 		})
 
 		Context("when the server is slow in responding", func() {
@@ -147,7 +148,14 @@ var _ = Describe("HealthCheck", func() {
 				timeout = time.Nanosecond
 			})
 
-			itReturnsHealthCheckError(portHealthCheck, 64, "timeout when making TCP connection")
+			It("returns healthcheck error with code 64 with an appropriate message", func() {
+				errMsg := fmt.Sprintf(
+					"Failed to make TCP connection to port %s: timed out after %.2f seconds",
+					port,
+					timeout.Seconds(),
+				)
+				itReturnsHealthCheckError(portHealthCheck, 64, errMsg)
+			})
 		})
 	})
 
@@ -172,7 +180,14 @@ var _ = Describe("HealthCheck", func() {
 					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(500, ""))
 				})
 
-				itReturnsHealthCheckError(httpHealthCheck, 6, "failure to get valid HTTP status code: 500")
+				It("returns healthcheck error with code 6 with an appropriate message", func() {
+					errMsg := fmt.Sprintf(
+						"Failed to make HTTP request to '%s' on port %s: received status code 500 in",
+						uri,
+						port,
+					)
+					itReturnsHealthCheckError(httpHealthCheck, 6, errMsg)
+				})
 			})
 
 			Context("when the address is not listening", func() {
@@ -180,7 +195,14 @@ var _ = Describe("HealthCheck", func() {
 					port = "-1"
 				})
 
-				itReturnsHealthCheckError(httpHealthCheck, 5, "failure to make HTTP request")
+				It("returns healthcheck error with code 5 with an appropriate message", func() {
+					errMsg := fmt.Sprintf(
+						"Failed to make HTTP request to '%s' on port %s: connection refused",
+						uri,
+						port,
+					)
+					itReturnsHealthCheckError(httpHealthCheck, 5, errMsg)
+				})
 			})
 
 			Context("when the server is too slow to respond", func() {
@@ -189,7 +211,15 @@ var _ = Describe("HealthCheck", func() {
 					serverDelay = time.Second
 				})
 
-				itReturnsHealthCheckError(httpHealthCheck, 65, "timeout when making HTTP request")
+				It("returns healthcheck error with code 65 with an appropriate message", func() {
+					errMsg := fmt.Sprintf(
+						"Failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
+						uri,
+						port,
+						timeout.Seconds(),
+					)
+					itReturnsHealthCheckError(httpHealthCheck, 65, errMsg)
+				})
 			})
 		})
 	})
