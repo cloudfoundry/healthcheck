@@ -3,6 +3,7 @@ package healthcheck_test
 import (
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -139,8 +140,11 @@ var _ = Describe("HealthCheck", func() {
 
 		Context("when the server is slow in responding", func() {
 			BeforeEach(func() {
+				if runtime.GOOS == "windows" {
+					Skip("TCP timeout tests are unreliable on Windows")
+				}
+
 				timeout = time.Nanosecond
-				serverDelay = time.Second
 			})
 
 			itReturnsHealthCheckError(portHealthCheck, 64, "timeout when making TCP connection")
