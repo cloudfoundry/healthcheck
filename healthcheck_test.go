@@ -130,11 +130,14 @@ var _ = Describe("HealthCheck", func() {
 
 		Context("when the address is not listening", func() {
 			BeforeEach(func() {
-				port = "1"
+				port = "-1"
 			})
 
 			It("returns healthcheck error with code 4 with an appropriate message", func() {
-				errMsg := "Failed to make TCP connection to port 1: connection refused"
+				errMsg := fmt.Sprintf(
+					"Failed to make TCP connection to port %s: connection refused",
+					port,
+				)
 				itReturnsHealthCheckError(portHealthCheck, 4, errMsg)
 			})
 		})

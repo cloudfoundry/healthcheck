@@ -65,17 +65,11 @@ var _ = Describe("HealthCheck", func() {
 	})
 
 	portHealthCheck := func() *gexec.Session {
-		args = append([]string{"-port", port, "-timeout", "100ms"}, args...)
-		session, err := gexec.Start(exec.Command(healthCheck, args...), GinkgoWriter, GinkgoWriter)
-		Expect(err).NotTo(HaveOccurred())
-		return session
+		return createPortHealthCheck(args, port)
 	}
 
 	httpHealthCheck := func() *gexec.Session {
-		args = append([]string{"-uri", "/api/_ping", "-port", port, "-timeout", "100ms"}, args...)
-		session, err := gexec.Start(exec.Command(healthCheck, args...), GinkgoWriter, GinkgoWriter)
-		Expect(err).NotTo(HaveOccurred())
-		return session
+		return createHTTPHealthCheck(args, port)
 	}
 
 	Describe("in readiness mode", func() {
