@@ -64,13 +64,23 @@ func main() {
 		timer := time.NewTimer(*readinessInterval)
 		defer timer.Stop()
 		sigCh := make(chan os.Signal)
+		errCh := make(chan error)
 		signal.Notify(sigCh, syscall.SIGTERM)
 
 		for {
-			err = h.CheckInterfaces(interfaces)
-			if err == nil {
-				os.Exit(0)
+			go func() {
+				errCh <- h.CheckInterfaces(interfaces)
+			}()
+
+			select {
+			case err = <-errCh:
+				if err == nil {
+					os.Exit(0)
+				}
+			case <-sigCh:
+				failHealthCheck(err)
 			}
+
 			select {
 			case <-timer.C:
 			case <-sigCh:
