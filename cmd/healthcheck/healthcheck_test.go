@@ -1,11 +1,10 @@
-// +build !windows
-
 package main_test
 
 import (
 	"net"
 	"net/http"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"syscall"
@@ -108,6 +107,9 @@ var _ = Describe("HealthCheck", func() {
 		})
 
 		It("exits with healthcheck error when signalled", func() {
+			if runtime.GOOS == "windows" {
+				Skip("SIGTERM does not work on windows")
+			}
 			session = httpHealthCheck()
 			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
 			session.Signal(syscall.SIGTERM)

@@ -1,3 +1,5 @@
+// +build external
+
 package main_test
 
 import (
@@ -10,8 +12,15 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
+func buildHealthCheck() string {
+	healthCheckPath, err := gexec.Build("code.cloudfoundry.org/healthcheck/cmd/healthcheck", "-tags", "external")
+	Expect(err).NotTo(HaveOccurred())
+	return healthCheckPath
+}
+
 func createHTTPHealthCheck(args []string, port string) *gexec.Session {
-	command := exec.Command(healthCheck, "-uri", "/api/_ping", "-port", "8080", "-timeout", "100ms")
+	args = append([]string{"-uri", "/api/_ping", "-port", port, "-timeout", "100ms"}, args...)
+	command := exec.Command(healthCheck, args...)
 	command.Env = append(
 		os.Environ(),
 		fmt.Sprintf(`CF_INSTANCE_PORTS=[{"external":%s,"internal":%s}]`, port, "8080"),
@@ -22,7 +31,8 @@ func createHTTPHealthCheck(args []string, port string) *gexec.Session {
 }
 
 func createPortHealthCheck(args []string, port string) *gexec.Session {
-	command := exec.Command(healthCheck, "-port", "8080", "-timeout", "100ms")
+	args = append([]string{"-port", port, "-timeout", "100ms"}, args...)
+	command := exec.Command(healthCheck, args...)
 	command.Env = append(
 		os.Environ(),
 		fmt.Sprintf(`CF_INSTANCE_PORTS=[{"external":%s,"internal":%s}]`, port, "8080"),

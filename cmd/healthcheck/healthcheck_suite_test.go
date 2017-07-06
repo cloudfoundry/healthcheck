@@ -16,8 +16,7 @@ func TestHealthCheck(t *testing.T) {
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	healthCheckPath, err := gexec.Build("code.cloudfoundry.org/healthcheck/cmd/healthcheck")
-	Expect(err).NotTo(HaveOccurred())
+	healthCheckPath := buildHealthCheck()
 	return []byte(healthCheckPath)
 }, func(healthCheckPath []byte) {
 	healthCheck = string(healthCheckPath)
