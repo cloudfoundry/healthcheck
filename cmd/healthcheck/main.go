@@ -61,8 +61,8 @@ func main() {
 	h := newHealthCheck(*network, *uri, *port, *timeout)
 
 	if readinessInterval != nil && *readinessInterval > 0 {
-		timer := time.NewTimer(*readinessInterval)
-		defer timer.Stop()
+		ticker := time.NewTicker(*readinessInterval)
+		defer ticker.Stop()
 		sigCh := make(chan os.Signal)
 		errCh := make(chan error)
 		signal.Notify(sigCh, syscall.SIGTERM)
@@ -82,7 +82,7 @@ func main() {
 			}
 
 			select {
-			case <-timer.C:
+			case <-ticker.C:
 			case <-sigCh:
 				failHealthCheck(err)
 			}

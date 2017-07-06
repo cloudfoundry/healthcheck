@@ -113,6 +113,22 @@ var _ = Describe("HealthCheck", func() {
 			session.Signal(syscall.SIGTERM)
 			Eventually(session).Should(gexec.Exit(6))
 		})
+
+		Context("with low readiness interval", func() {
+			BeforeEach(func() {
+				server.HTTPTestServer.Close()
+				args = []string{"-readiness-interval=10ms"}
+			})
+
+			It("continues to retry until the server is started", func() {
+				session = portHealthCheck()
+				Consistently(session).ShouldNot(gexec.Exit())
+				listener, err := net.Listen("tcp", ":"+port)
+				Expect(err).NotTo(HaveOccurred())
+				defer listener.Close()
+				Eventually(session).Should(gexec.Exit())
+			})
+		})
 	})
 
 	Describe("in liveness mode", func() {
