@@ -42,6 +42,12 @@ var readinessInterval = flag.Duration(
 	"if set, starts the healthcheck in readiness mode, i.e. do not exit until the healthcheck passes. runs checks every readiness-interval",
 )
 
+var readinessTimeout = flag.Duration(
+	"readiness-timeout",
+	60*time.Second,
+	"Only relevant if healthcheck is running in readiness mode. When the timeout is set to a non-zero value, the healthcheck will return non-zero with any errors if this timeout is hit without the healthcheck passing",
+)
+
 var livenessInterval = flag.Duration(
 	"liveness-interval",
 	0,
@@ -60,6 +66,11 @@ func main() {
 
 	h := newHealthCheck(*network, *uri, *port, *timeout)
 
+	var timeoutTimerCh <-chan time.Time
+	if duration := *readinessTimeout; duration > 0 {
+		timeoutTimerCh = time.NewTimer(duration).C
+	}
+
 	if readinessInterval != nil && *readinessInterval > 0 {
 		ticker := time.NewTicker(*readinessInterval)
 		defer ticker.Stop()
@@ -77,13 +88,13 @@ func main() {
 				if err == nil {
 					os.Exit(0)
 				}
-			case <-sigCh:
+			case <-timeoutTimerCh:
 				failHealthCheck(err)
 			}
 
 			select {
 			case <-ticker.C:
-			case <-sigCh:
+			case <-timeoutTimerCh:
 				failHealthCheck(err)
 			}
 		}

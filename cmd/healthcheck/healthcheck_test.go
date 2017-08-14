@@ -4,10 +4,8 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -84,7 +82,7 @@ var _ = Describe("HealthCheck", func() {
 				resp.WriteHeader(int(statusCode))
 			}))
 
-			args = []string{"-readiness-interval=1s"}
+			args = []string{"-readiness-interval=1s", "-readiness-timeout=2s"}
 		})
 
 		AfterEach(func() {
@@ -106,14 +104,21 @@ var _ = Describe("HealthCheck", func() {
 			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
 		})
 
-		It("exits with healthcheck error when signalled", func() {
-			if runtime.GOOS == "windows" {
-				Skip("SIGTERM does not work on windows")
-			}
+		It("exits with healthcheck error after readiness-timeout has been reached", func() {
 			session = httpHealthCheck()
-			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
-			session.Signal(syscall.SIGTERM)
-			Eventually(session).Should(gexec.Exit(6))
+			Eventually(server.ReceivedRequests).ShouldNot(BeEmpty())
+			Eventually(session, 3*time.Second).Should(gexec.Exit(6))
+		})
+
+		Context("when readiness timeout is set to 0", func() {
+			BeforeEach(func() {
+				args = []string{"-readiness-interval=1s", "-readiness-timeout=0s"}
+			})
+
+			It("does not timeout", func() {
+				session = httpHealthCheck()
+				Consistently(session).ShouldNot(gexec.Exit())
+			})
 		})
 
 		Context("with low readiness interval", func() {
