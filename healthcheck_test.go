@@ -35,7 +35,8 @@ var _ = Describe("HealthCheck", func() {
 		timeout     time.Duration
 		serverDelay time.Duration
 
-		hc healthcheck.HealthCheck
+		hc      healthcheck.HealthCheck
+		handler func(http.ResponseWriter, *http.Request)
 	)
 
 	BeforeEach(func() {
@@ -52,13 +53,16 @@ var _ = Describe("HealthCheck", func() {
 		serverAddr = listener.Addr().String()
 		_, port, err = net.SplitHostPort(serverAddr)
 		Expect(err).NotTo(HaveOccurred())
+
+		handler = func(http.ResponseWriter, *http.Request) {
+			time.Sleep(serverDelay)
+		}
+
 	})
 
 	JustBeforeEach(func() {
-		server.RouteToHandler("GET", "/api/_ping",
-			func(http.ResponseWriter, *http.Request) {
-				time.Sleep(serverDelay)
-			})
+
+		server.RouteToHandler("GET", "/api/_ping", handler)
 		server.Start()
 
 		hc = healthcheck.NewHealthCheck("tcp", uri, port, timeout)
@@ -224,6 +228,24 @@ var _ = Describe("HealthCheck", func() {
 					itReturnsHealthCheckError(httpHealthCheck, 65, errMsg)
 				})
 			})
+
+			Context("with a tls-aware endpoint", func() {
+				var request *http.Request
+				BeforeEach(func() {
+					uri = "/api/_ping"
+					handler = func(resp http.ResponseWriter, req *http.Request) {
+						request = req
+						time.Sleep(serverDelay)
+					}
+				})
+
+				It("should set the x-Forwarded-proto header", func() {
+					err := hc.HTTPHealthCheck(ip)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(request.Header.Get("X-Forwarded-Proto")).To(Equal("https"))
+				})
+			})
+
 		})
 	})
 })

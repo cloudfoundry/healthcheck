@@ -73,7 +73,18 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 		Timeout: h.timeout,
 	}
 	now := time.Now()
-	resp, err := client.Get(addr)
+	req, err := http.NewRequest("GET", addr, nil)
+	if err != nil {
+		errMsg := fmt.Sprintf(
+			"Failed to create an HTTP request to '%s' on port %s",
+			h.uri,
+			h.port,
+		)
+		return HealthCheckError{Code: 6, Message: errMsg}
+	}
+
+	req.Header.Set("X-Forwarded-Proto", "https")
+	resp, err := client.Do(req)
 	dur := time.Since(now)
 	if err == nil {
 		defer resp.Body.Close()
