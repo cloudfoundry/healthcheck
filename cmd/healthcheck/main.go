@@ -74,7 +74,7 @@ func main() {
 	if readinessInterval != nil && *readinessInterval > 0 {
 		ticker := time.NewTicker(*readinessInterval)
 		defer ticker.Stop()
-		sigCh := make(chan os.Signal)
+		sigCh := make(chan os.Signal, 1)
 		errCh := make(chan error)
 		signal.Notify(sigCh, syscall.SIGTERM)
 
