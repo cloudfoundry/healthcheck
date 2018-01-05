@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -94,6 +95,19 @@ var _ = Describe("HealthCheck", func() {
 			Consistently(session).ShouldNot(gexec.Exit())
 			atomic.StoreInt64(&statusCode, http.StatusOK)
 			Eventually(session, 2*time.Second).Should(gexec.Exit(0))
+		})
+
+		Context("when the timeout is large", func() {
+			BeforeEach(func() {
+				args = []string{"-readiness-interval=1s", "-readiness-timeout=60s"}
+			})
+
+			It("exits with healthcheck error when signalled", func() {
+				session = httpHealthCheck()
+				Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+				session.Signal(syscall.SIGTERM)
+				Eventually(session).Should(gexec.Exit())
+			})
 		})
 
 		It("runs a healthcheck every readiness-interval", func() {
