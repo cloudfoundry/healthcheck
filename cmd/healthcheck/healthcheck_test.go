@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"syscall"
@@ -99,6 +100,9 @@ var _ = Describe("HealthCheck", func() {
 
 		Context("when the timeout is large", func() {
 			BeforeEach(func() {
+				if runtime.GOOS == "windows" {
+					Skip("skipping since SIGTERM probably doesn't work on Windows")
+				}
 				args = []string{"-readiness-interval=1s", "-readiness-timeout=60s"}
 			})
 
