@@ -199,7 +199,7 @@ var _ = Describe("HealthCheck", func() {
 
 			Context("when the address is not listening", func() {
 				BeforeEach(func() {
-					port = "9876"
+					port = "100003"
 				})
 
 				It("returns healthcheck error with code 5 with an appropriate message", func() {
