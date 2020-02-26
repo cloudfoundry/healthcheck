@@ -83,6 +83,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 		return HealthCheckError{Code: 6, Message: errMsg}
 	}
 
+	req.Header.Set("User-Agent", "diego-healthcheck")
 	req.Header.Set("X-Forwarded-Proto", "https")
 	resp, err := client.Do(req)
 	dur := time.Since(now)
