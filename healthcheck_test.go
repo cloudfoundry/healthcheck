@@ -244,6 +244,13 @@ var _ = Describe("HealthCheck", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(request.Header.Get("X-Forwarded-Proto")).To(Equal("https"))
 				})
+
+				It("should set the User-Agent header", func() {
+					err := hc.HTTPHealthCheck(ip)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(request.Header.Get("User-Agent")).To(Equal("diego-healthcheck"))
+				})
+
 			})
 
 		})
