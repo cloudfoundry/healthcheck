@@ -204,7 +204,7 @@ var _ = Describe("HealthCheck", func() {
 				port = "-1"
 			})
 
-			itExitsWithCode(portHealthCheck, 4, "Failed to make TCP connection to port -1: connection refused")
+			itExitsWithCode(portHealthCheck, 4, "Failed to make TCP connection to port -1: dial tcp: address -1: invalid port")
 		})
 	})
 

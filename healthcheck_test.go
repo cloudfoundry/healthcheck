@@ -139,7 +139,7 @@ var _ = Describe("HealthCheck", func() {
 
 			It("returns healthcheck error with code 4 with an appropriate message", func() {
 				errMsg := fmt.Sprintf(
-					"Failed to make TCP connection to port %s: connection refused",
+					"Failed to make TCP connection to port %s: dial tcp: address -1: invalid port",
 					port,
 				)
 				itReturnsHealthCheckError(portHealthCheck, 4, errMsg)
