@@ -64,7 +64,7 @@ func (h *HealthCheck) PortHealthCheck(ip string) error {
 		return HealthCheckError{Code: 64, Message: msg}
 	}
 
-	return HealthCheckError{Code: 4, Message: fmt.Sprintf("Failed to make TCP connection to port %s: connection refused", h.port)}
+	return HealthCheckError{Code: 4, Message: fmt.Sprintf("Failed to make TCP connection to port %s: %s", h.port, err.Error())}
 }
 
 func (h *HealthCheck) HTTPHealthCheck(ip string) error {
