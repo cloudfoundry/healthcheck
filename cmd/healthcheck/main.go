@@ -74,23 +74,30 @@ func main() {
 		defer ticker.Stop()
 		errCh := make(chan error)
 
-		for {
+		for attempt := 0; ; attempt++ {
+			fmt.Printf("Readiness check attempt #%d\n", attempt)
 			go func() {
-				errCh <- h.CheckInterfaces(interfaces)
+				err = h.CheckInterfaces(interfaces)
+				fmt.Printf("Returning the following on the error channel: %v\n", err)
+				errCh <- err
 			}()
 
 			select {
 			case err = <-errCh:
 				if err == nil {
+					fmt.Println("Error received was nil, bailing NOW!")
 					os.Exit(0)
 				}
 			case <-timeoutTimerCh:
+				fmt.Println("Timed out waiting for CheckInterfaces to return.")
 				failHealthCheck(err)
 			}
 
 			select {
 			case <-ticker.C:
+				fmt.Println("Tick Tock")
 			case <-timeoutTimerCh:
+				fmt.Println("Timed out before another healthcheck could start.")
 				failHealthCheck(err)
 			}
 		}
