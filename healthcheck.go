@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -35,17 +36,15 @@ func (h *HealthCheck) CheckInterfaces(interfaces []net.Interface) error {
 	}
 
 	for _, intf := range interfaces {
-		fmt.Printf("Checking interface %v\n", intf)
 		addrs, err := intf.Addrs()
 		if err != nil {
-			fmt.Printf("Failed getting addresses for interface %v\n", intf)
+			fmt.Fprintf(os.Stderr, "Warning: failed getting addresses for interface %v\n", intf)
 			continue
 		}
 
 		for _, a := range addrs {
-			fmt.Printf("Checking address %v\n", a)
 			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-				fmt.Println("Found a non-loopback, IPV4 address")
+				fmt.Fprintf(os.Stdout, "Using %s for health checking (first non-loopback IPv4 addr found)\n", ipnet.IP.String())
 				err := healthcheck(ipnet.IP.String())
 				return err
 			}
@@ -59,7 +58,6 @@ func (h *HealthCheck) PortHealthCheck(ip string) error {
 	addr := ip + ":" + h.port
 	conn, err := net.DialTimeout(h.network, addr, h.timeout)
 	if err == nil {
-		fmt.Printf("Dialing the port %s succeeded\n", h.port)
 		conn.Close()
 		return nil
 	}
