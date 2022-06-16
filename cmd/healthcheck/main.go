@@ -57,7 +57,7 @@ func main() {
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		fmt.Println(fmt.Sprintf("failure to get interfaces: %s", err))
+		fmt.Fprintf(os.Stderr, "Failed to get interfaces: %s\n", err)
 		os.Exit(1)
 		return
 	}
@@ -75,29 +75,29 @@ func main() {
 		errCh := make(chan error)
 
 		for attempt := 0; ; attempt++ {
-			fmt.Printf("Readiness check attempt #%d\n", attempt)
+			fmt.Fprintf(os.Stdout, "Readiness check attempt #%d\n", attempt)
 			go func() {
 				err = h.CheckInterfaces(interfaces)
-				fmt.Printf("Returning the following on the error channel: %v\n", err)
 				errCh <- err
 			}()
 
 			select {
 			case err = <-errCh:
 				if err == nil {
-					fmt.Println("Error received was nil, bailing NOW!")
+					fmt.Fprintf(os.Stdout, "Readiness check successful\n")
 					os.Exit(0)
 				}
+				fmt.Fprintf(os.Stderr, "Readiness check unsuccessful: %s\n", err)
 			case <-timeoutTimerCh:
-				fmt.Println("Timed out waiting for CheckInterfaces to return.")
+				fmt.Fprintf(os.Stderr, "Timed out after %s waiting for readiness check to succeed\n", *readinessTimeout)
 				failHealthCheck(err)
 			}
 
 			select {
 			case <-ticker.C:
-				fmt.Println("Tick Tock")
+				fmt.Fprintf(os.Stderr, "Readiness Interval (%s) elapsed, checking again\n", *readinessInterval)
 			case <-timeoutTimerCh:
-				fmt.Println("Timed out before another healthcheck could start.")
+				fmt.Fprintf(os.Stderr, "Timed out after %s waiting for readiness check to succeed\n", *readinessTimeout)
 				failHealthCheck(err)
 			}
 		}
@@ -123,10 +123,10 @@ func main() {
 
 func failHealthCheck(err error) {
 	if err, ok := err.(healthcheck.HealthCheckError); ok {
-		fmt.Print(err.Message)
+		fmt.Fprintf(os.Stderr, "%s\n", err.Message)
 		os.Exit(err.Code)
 	}
 
-	fmt.Print("healthcheck failed(unknown error)" + err.Error())
+	fmt.Fprintf(os.Stderr, "Unknown error encountered in healthcheck: %s\n", err.Error())
 	os.Exit(127)
 }
