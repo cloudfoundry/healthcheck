@@ -138,10 +138,7 @@ var _ = Describe("HealthCheck", func() {
 			})
 
 			It("returns healthcheck error with code 4 with an appropriate message", func() {
-				errMsg := fmt.Sprintf(
-					"Failed to make TCP connection to port %s: dial tcp: address -1: invalid port",
-					port,
-				)
+				errMsg := fmt.Sprintf("failed to make TCP connection to %s:%s: dial tcp: address %s: invalid port", ip, port, port)
 				itReturnsHealthCheckError(portHealthCheck, 4, errMsg)
 			})
 		})
@@ -156,11 +153,7 @@ var _ = Describe("HealthCheck", func() {
 			})
 
 			It("returns healthcheck error with code 64 with an appropriate message", func() {
-				errMsg := fmt.Sprintf(
-					"Failed to make TCP connection to port %s: timed out after %.2f seconds",
-					port,
-					timeout.Seconds(),
-				)
+				errMsg := fmt.Sprintf("failed to make TCP connection to %s:%s: timed out after 0.00 seconds", ip, port)
 				itReturnsHealthCheckError(portHealthCheck, 64, errMsg)
 			})
 		})
@@ -189,7 +182,7 @@ var _ = Describe("HealthCheck", func() {
 
 				It("returns healthcheck error with code 6 with an appropriate message", func() {
 					errMsg := fmt.Sprintf(
-						"Failed to make HTTP request to '%s' on port %s: received status code 500 in",
+						"failed to make HTTP request to '%s' on port %s: received status code 500 in",
 						uri,
 						port,
 					)
@@ -204,7 +197,7 @@ var _ = Describe("HealthCheck", func() {
 
 				It("returns healthcheck error with code 5 with an appropriate message", func() {
 					errMsg := fmt.Sprintf(
-						"Failed to make HTTP request to '%s' on port %s: connection refused",
+						"failed to make HTTP request to '%s' on port %s: connection refused",
 						uri,
 						port,
 					)
@@ -220,7 +213,7 @@ var _ = Describe("HealthCheck", func() {
 
 				It("returns healthcheck error with code 65 with an appropriate message", func() {
 					errMsg := fmt.Sprintf(
-						"Failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
+						"failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
 						uri,
 						port,
 						timeout.Seconds(),

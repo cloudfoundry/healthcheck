@@ -29,7 +29,7 @@ var _ = Describe("HealthCheck", func() {
 		It("exits with code "+strconv.Itoa(code)+" and logs reason", func() {
 			session := healthCheck()
 			Eventually(session).Should(gexec.Exit(code))
-			Expect(session.Out).To(gbytes.Say(reason))
+			Expect(session.Err).To(gbytes.Say(reason))
 		})
 	}
 
@@ -181,8 +181,8 @@ var _ = Describe("HealthCheck", func() {
 			Consistently(session).ShouldNot(gexec.Exit())
 			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
 			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
-			Expect(session.Out).NotTo(gbytes.Say("healthcheck failed"))
-			Expect(session.Out).To(gbytes.Say("received status code 500 in"))
+			Expect(session.Err).NotTo(gbytes.Say("healthcheck failed"))
+			Expect(session.Err).To(gbytes.Say("received status code 500 in"))
 		})
 
 		It("runs a healthcheck every liveness-interval", func() {
@@ -204,7 +204,7 @@ var _ = Describe("HealthCheck", func() {
 				port = "-1"
 			})
 
-			itExitsWithCode(portHealthCheck, 4, "Failed to make TCP connection to port -1: dial tcp: address -1: invalid port")
+			itExitsWithCode(portHealthCheck, 4, "dial tcp: address -1: invalid port")
 		})
 	})
 

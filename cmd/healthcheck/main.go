@@ -74,8 +74,7 @@ func main() {
 		defer ticker.Stop()
 		errCh := make(chan error)
 
-		for attempt := 0; ; attempt++ {
-			fmt.Fprintf(os.Stdout, "Readiness check attempt #%d\n", attempt)
+		for attempt := 1; ; attempt++ {
 			go func() {
 				err = h.CheckInterfaces(interfaces)
 				errCh <- err
@@ -84,20 +83,17 @@ func main() {
 			select {
 			case err = <-errCh:
 				if err == nil {
-					fmt.Fprintf(os.Stdout, "Readiness check successful\n")
 					os.Exit(0)
 				}
-				fmt.Fprintf(os.Stderr, "Readiness check unsuccessful: %s\n", err)
 			case <-timeoutTimerCh:
-				fmt.Fprintf(os.Stderr, "Timed out after %s waiting for readiness check to succeed\n", *readinessTimeout)
+				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for readiness check to succeed: ", *readinessTimeout, attempt)
 				failHealthCheck(err)
 			}
 
 			select {
 			case <-ticker.C:
-				fmt.Fprintf(os.Stderr, "Readiness Interval (%s) elapsed, checking again\n", *readinessInterval)
 			case <-timeoutTimerCh:
-				fmt.Fprintf(os.Stderr, "Timed out after %s waiting for readiness check to succeed\n", *readinessTimeout)
+				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for readiness check to succeed: ", *readinessTimeout, attempt)
 				failHealthCheck(err)
 			}
 		}
@@ -107,6 +103,7 @@ func main() {
 		for {
 			err = h.CheckInterfaces(interfaces)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Liveness check unsuccessful: ")
 				failHealthCheck(err)
 			}
 			time.Sleep(*livenessInterval)
