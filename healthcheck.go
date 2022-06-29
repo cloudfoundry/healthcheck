@@ -44,7 +44,6 @@ func (h *HealthCheck) CheckInterfaces(interfaces []net.Interface) error {
 
 		for _, a := range addrs {
 			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-				fmt.Fprintf(os.Stdout, "Using %s for health checking (first non-loopback IPv4 addr found)\n", ipnet.IP.String())
 				err := healthcheck(ipnet.IP.String())
 				return err
 			}
@@ -63,11 +62,11 @@ func (h *HealthCheck) PortHealthCheck(ip string) error {
 	}
 
 	if err, ok := err.(net.Error); ok && err.Timeout() {
-		msg := fmt.Sprintf("Failed to make TCP connection to port %s: timed out after %.2f seconds", h.port, h.timeout.Seconds())
+		msg := fmt.Sprintf("failed to make TCP connection to %s: timed out after %.2f seconds", addr, h.timeout.Seconds())
 		return HealthCheckError{Code: 64, Message: msg}
 	}
 
-	return HealthCheckError{Code: 4, Message: fmt.Sprintf("Failed to make TCP connection to port %s: %s", h.port, err.Error())}
+	return HealthCheckError{Code: 4, Message: fmt.Sprintf("failed to make TCP connection to %s: %s", addr, err.Error())}
 }
 
 func (h *HealthCheck) HTTPHealthCheck(ip string) error {
@@ -79,7 +78,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 	req, err := http.NewRequest("GET", addr, nil)
 	if err != nil {
 		errMsg := fmt.Sprintf(
-			"Failed to create an HTTP request to '%s' on port %s",
+			"failed to create an HTTP request to '%s' on port %s",
 			h.uri,
 			h.port,
 		)
@@ -103,7 +102,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 		}
 
 		errMsg := fmt.Sprintf(
-			"Failed to make HTTP request to '%s' on port %s: received status code %d in %dms",
+			"failed to make HTTP request to '%s' on port %s: received status code %d in %dms",
 			h.uri,
 			h.port,
 			resp.StatusCode,
@@ -114,7 +113,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 
 	if err, ok := err.(net.Error); ok && err.Timeout() {
 		errMsg := fmt.Sprintf(
-			"Failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
+			"failed to make HTTP request to '%s' on port %s: timed out after %.2f seconds",
 			h.uri,
 			h.port,
 			h.timeout.Seconds(),
@@ -123,7 +122,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 	}
 
 	errMsg := fmt.Sprintf(
-		"Failed to make HTTP request to '%s' on port %s: connection refused",
+		"failed to make HTTP request to '%s' on port %s: connection refused",
 		h.uri,
 		h.port,
 	)
