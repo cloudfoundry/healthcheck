@@ -12,7 +12,7 @@ var healthCheck string
 
 func TestHealthCheck(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "HealthCheck Suite")
+	RunSpecs(t, "HealthCheck CLI Suite")
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
