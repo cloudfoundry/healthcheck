@@ -34,16 +34,16 @@ var timeout = flag.Duration(
 	"dial timeout",
 )
 
-var readinessInterval = flag.Duration(
-	"readiness-interval",
+var startupInterval = flag.Duration(
+	"startup-interval",
 	0,
-	"if set, starts the healthcheck in readiness mode, i.e. do not exit until the healthcheck passes. runs checks every readiness-interval",
+	"if set, starts the healthcheck in startup mode, i.e. do not exit until the healthcheck passes. runs checks every startup-interval",
 )
 
-var readinessTimeout = flag.Duration(
-	"readiness-timeout",
+var startupTimeout = flag.Duration(
+	"startup-timeout",
 	60*time.Second,
-	"Only relevant if healthcheck is running in readiness mode. When the timeout is set to a non-zero value, the healthcheck will return non-zero with any errors if this timeout is hit without the healthcheck passing",
+	"Only relevant if healthcheck is running in startup mode. When the timeout is set to a non-zero value, the healthcheck will return non-zero with any errors if this timeout is hit without the healthcheck passing",
 )
 
 var livenessInterval = flag.Duration(
@@ -65,12 +65,12 @@ func main() {
 	h := newHealthCheck(*network, *uri, *port, *timeout)
 
 	var timeoutTimerCh <-chan time.Time
-	if duration := *readinessTimeout; duration > 0 {
+	if duration := *startupTimeout; duration > 0 {
 		timeoutTimerCh = time.NewTimer(duration).C
 	}
 
-	if readinessInterval != nil && *readinessInterval > 0 {
-		ticker := time.NewTicker(*readinessInterval)
+	if startupInterval != nil && *startupInterval > 0 {
+		ticker := time.NewTicker(*startupInterval)
 		defer ticker.Stop()
 		errCh := make(chan error)
 
@@ -86,14 +86,14 @@ func main() {
 					os.Exit(0)
 				}
 			case <-timeoutTimerCh:
-				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for readiness check to succeed: ", *readinessTimeout, attempt)
+				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for startup check to succeed: ", *startupTimeout, attempt)
 				failHealthCheck(err)
 			}
 
 			select {
 			case <-ticker.C:
 			case <-timeoutTimerCh:
-				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for readiness check to succeed: ", *readinessTimeout, attempt)
+				fmt.Fprintf(os.Stderr, "Timed out after %s (%d attempts) waiting for startup check to succeed: ", *startupTimeout, attempt)
 				failHealthCheck(err)
 			}
 		}

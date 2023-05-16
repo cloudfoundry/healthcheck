@@ -71,7 +71,7 @@ var _ = Describe("HealthCheck", func() {
 		return createHTTPHealthCheck(args, port)
 	}
 
-	Describe("in readiness mode", func() {
+	Describe("in startup mode", func() {
 		var (
 			session    *gexec.Session
 			statusCode int64
@@ -84,7 +84,7 @@ var _ = Describe("HealthCheck", func() {
 				resp.WriteHeader(int(statusCode))
 			}))
 
-			args = []string{"-readiness-interval=1s", "-readiness-timeout=2s"}
+			args = []string{"-startup-interval=1s", "-startup-timeout=2s"}
 		})
 
 		AfterEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("HealthCheck", func() {
 				if runtime.GOOS == "windows" {
 					Skip("skipping since SIGTERM probably doesn't work on Windows")
 				}
-				args = []string{"-readiness-interval=1s", "-readiness-timeout=60s"}
+				args = []string{"-startup-interval=1s", "-startup-timeout=60s"}
 			})
 
 			It("exits with healthcheck error when signalled", func() {
@@ -114,7 +114,7 @@ var _ = Describe("HealthCheck", func() {
 			})
 		})
 
-		It("runs a healthcheck every readiness-interval", func() {
+		It("runs a healthcheck every startup-interval", func() {
 			session = httpHealthCheck()
 			start := time.Now()
 			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
@@ -122,15 +122,15 @@ var _ = Describe("HealthCheck", func() {
 			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
 		})
 
-		It("exits with healthcheck error after readiness-timeout has been reached", func() {
+		It("exits with healthcheck error after startup-timeout has been reached", func() {
 			session = httpHealthCheck()
 			Eventually(server.ReceivedRequests).ShouldNot(BeEmpty())
 			Eventually(session, 3*time.Second).Should(gexec.Exit(6))
 		})
 
-		Context("when readiness timeout is set to 0", func() {
+		Context("when startup timeout is set to 0", func() {
 			BeforeEach(func() {
-				args = []string{"-readiness-interval=1s", "-readiness-timeout=0s"}
+				args = []string{"-startup-interval=1s", "-startup-timeout=0s"}
 			})
 
 			It("does not timeout", func() {
@@ -139,10 +139,10 @@ var _ = Describe("HealthCheck", func() {
 			})
 		})
 
-		Context("with low readiness interval", func() {
+		Context("with low startup interval", func() {
 			BeforeEach(func() {
 				server.HTTPTestServer.Close()
-				args = []string{"-readiness-interval=10ms"}
+				args = []string{"-startup-interval=10ms"}
 			})
 
 			It("continues to retry until the server is started", func() {
