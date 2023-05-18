@@ -49,7 +49,13 @@ var startupTimeout = flag.Duration(
 var livenessInterval = flag.Duration(
 	"liveness-interval",
 	0,
-	"if set, starts the healthcheck in liveness mode, i.e. do not exit until the healthcheck fail. runs checks every liveness-interval",
+	"if set, starts the healthcheck in liveness mode, i.e. the app is alive and hasn't crashed, do not exit until the healthcheck fails. runs checks every liveness-interval",
+)
+
+var readinessInterval = flag.Duration(
+	"readiness-interval",
+	0,
+	"if set, starts the healthcheck in readiness mode, i.e. the app is ready to serve traffic, do not exit until the healthcheck fails because the target isn't serving traffic or another process doesn't exist. runs checks every readiness-interval",
 )
 
 func main() {
@@ -107,6 +113,17 @@ func main() {
 				failHealthCheck(err)
 			}
 			time.Sleep(*livenessInterval)
+		}
+	}
+
+	if readinessInterval != nil && *readinessInterval > 0 {
+		for {
+			err = h.CheckInterfaces(interfaces)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Readiness check unsuccessful: ")
+				failHealthCheck(err)
+			}
+			time.Sleep(*readinessInterval)
 		}
 	}
 

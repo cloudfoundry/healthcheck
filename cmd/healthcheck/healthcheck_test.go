@@ -182,10 +182,50 @@ var _ = Describe("HealthCheck", func() {
 			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
 			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
 			Expect(session.Err).NotTo(gbytes.Say("healthcheck failed"))
+			Expect(session.Err).To(gbytes.Say("Liveness check unsuccessful"))
 			Expect(session.Err).To(gbytes.Say("received status code 500 in"))
 		})
 
 		It("runs a healthcheck every liveness-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+	})
+
+	Describe("in readiness mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64
+		)
+
+		BeforeEach(func() {
+			statusCode = http.StatusOK
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-readiness-interval=1s"}
+		})
+
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is down", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
+			Expect(session.Err).NotTo(gbytes.Say("healthcheck failed"))
+			Expect(session.Err).To(gbytes.Say("Readiness check unsuccessful"))
+			Expect(session.Err).To(gbytes.Say("received status code 500 in"))
+		})
+
+		It("runs a healthcheck every readiness-interval", func() {
 			session = httpHealthCheck()
 			start := time.Now()
 			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
@@ -220,7 +260,7 @@ var _ = Describe("HealthCheck", func() {
 
 			Context("when the address returns error http code", func() {
 				BeforeEach(func() {
-					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(500, ""))
+					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(http.StatusInternalServerError, ""))
 				})
 
 				itExitsWithCode(httpHealthCheck, 6, "received status code 500 in")
