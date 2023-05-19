@@ -58,6 +58,12 @@ var readinessInterval = flag.Duration(
 	"if set, starts the healthcheck in readiness mode, i.e. the app is ready to serve traffic, do not exit until the healthcheck fails because the target isn't serving traffic or another process doesn't exist. runs checks every readiness-interval",
 )
 
+var untilReadyInterval = flag.Duration(
+	"until-ready-interval",
+	0,
+	"if set, starts the healthcheck in until-ready mode, i.e. do not exit until the healthcheck passes and the app is ready to serve traffic. runs checks every until-ready-interval",
+)
+
 func main() {
 	flag.Parse()
 
@@ -124,6 +130,16 @@ func main() {
 				failHealthCheck(err)
 			}
 			time.Sleep(*readinessInterval)
+		}
+	}
+
+	if untilReadyInterval != nil && *untilReadyInterval > 0 {
+		for {
+			err = h.CheckInterfaces(interfaces)
+			if err == nil {
+				os.Exit(0)
+			}
+			time.Sleep(*untilReadyInterval)
 		}
 	}
 

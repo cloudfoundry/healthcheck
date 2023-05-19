@@ -156,6 +156,59 @@ var _ = Describe("HealthCheck", func() {
 		})
 	})
 
+	Describe("in until-ready mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64
+		)
+
+		BeforeEach(func() {
+			statusCode = http.StatusInternalServerError
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-until-ready-interval=1s"}
+		})
+
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is started", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+
+			atomic.StoreInt64(&statusCode, http.StatusOK)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(0))
+		})
+
+		It("runs a healthcheck every until-ready-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+
+		Context("with low startup interval", func() {
+			BeforeEach(func() {
+				server.HTTPTestServer.Close()
+				args = []string{"-until-ready-interval=10ms"}
+			})
+
+			It("continues to retry until the server is started", func() {
+				session = portHealthCheck()
+				Consistently(session).ShouldNot(gexec.Exit())
+				listener, err := net.Listen("tcp", ":"+port)
+				Expect(err).NotTo(HaveOccurred())
+				defer listener.Close()
+				Eventually(session).Should(gexec.Exit())
+			})
+		})
+	})
+
 	Describe("in liveness mode", func() {
 		var (
 			session    *gexec.Session
