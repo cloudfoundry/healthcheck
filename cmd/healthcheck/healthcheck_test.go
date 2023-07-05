@@ -71,7 +71,7 @@ var _ = Describe("HealthCheck", func() {
 		return createHTTPHealthCheck(args, port)
 	}
 
-	Describe("in readiness mode", func() {
+	Describe("in startup mode", func() {
 		var (
 			session    *gexec.Session
 			statusCode int64
@@ -84,7 +84,7 @@ var _ = Describe("HealthCheck", func() {
 				resp.WriteHeader(int(statusCode))
 			}))
 
-			args = []string{"-readiness-interval=1s", "-readiness-timeout=2s"}
+			args = []string{"-startup-interval=1s", "-startup-timeout=2s"}
 		})
 
 		AfterEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("HealthCheck", func() {
 				if runtime.GOOS == "windows" {
 					Skip("skipping since SIGTERM probably doesn't work on Windows")
 				}
-				args = []string{"-readiness-interval=1s", "-readiness-timeout=60s"}
+				args = []string{"-startup-interval=1s", "-startup-timeout=60s"}
 			})
 
 			It("exits with healthcheck error when signalled", func() {
@@ -114,7 +114,7 @@ var _ = Describe("HealthCheck", func() {
 			})
 		})
 
-		It("runs a healthcheck every readiness-interval", func() {
+		It("runs a healthcheck every startup-interval", func() {
 			session = httpHealthCheck()
 			start := time.Now()
 			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
@@ -122,15 +122,15 @@ var _ = Describe("HealthCheck", func() {
 			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
 		})
 
-		It("exits with healthcheck error after readiness-timeout has been reached", func() {
+		It("exits with healthcheck error after startup-timeout has been reached", func() {
 			session = httpHealthCheck()
 			Eventually(server.ReceivedRequests).ShouldNot(BeEmpty())
 			Eventually(session, 3*time.Second).Should(gexec.Exit(6))
 		})
 
-		Context("when readiness timeout is set to 0", func() {
+		Context("when startup timeout is set to 0", func() {
 			BeforeEach(func() {
-				args = []string{"-readiness-interval=1s", "-readiness-timeout=0s"}
+				args = []string{"-startup-interval=1s", "-startup-timeout=0s"}
 			})
 
 			It("does not timeout", func() {
@@ -139,10 +139,63 @@ var _ = Describe("HealthCheck", func() {
 			})
 		})
 
-		Context("with low readiness interval", func() {
+		Context("with low startup interval", func() {
 			BeforeEach(func() {
 				server.HTTPTestServer.Close()
-				args = []string{"-readiness-interval=10ms"}
+				args = []string{"-startup-interval=10ms"}
+			})
+
+			It("continues to retry until the server is started", func() {
+				session = portHealthCheck()
+				Consistently(session).ShouldNot(gexec.Exit())
+				listener, err := net.Listen("tcp", ":"+port)
+				Expect(err).NotTo(HaveOccurred())
+				defer listener.Close()
+				Eventually(session).Should(gexec.Exit())
+			})
+		})
+	})
+
+	Describe("in until-ready mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64
+		)
+
+		BeforeEach(func() {
+			statusCode = http.StatusInternalServerError
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-until-ready-interval=1s"}
+		})
+
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is started", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+
+			atomic.StoreInt64(&statusCode, http.StatusOK)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(0))
+		})
+
+		It("runs a healthcheck every until-ready-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+
+		Context("with low startup interval", func() {
+			BeforeEach(func() {
+				server.HTTPTestServer.Close()
+				args = []string{"-until-ready-interval=10ms"}
 			})
 
 			It("continues to retry until the server is started", func() {
@@ -182,10 +235,50 @@ var _ = Describe("HealthCheck", func() {
 			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
 			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
 			Expect(session.Err).NotTo(gbytes.Say("healthcheck failed"))
+			Expect(session.Err).To(gbytes.Say("Liveness check unsuccessful"))
 			Expect(session.Err).To(gbytes.Say("received status code 500 in"))
 		})
 
 		It("runs a healthcheck every liveness-interval", func() {
+			session = httpHealthCheck()
+			start := time.Now()
+			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
+			end := time.Now()
+			Expect(end.Sub(start)).To(BeNumerically("~", 1*time.Second, 100*time.Millisecond))
+		})
+	})
+
+	Describe("in readiness mode", func() {
+		var (
+			session    *gexec.Session
+			statusCode int64
+		)
+
+		BeforeEach(func() {
+			statusCode = http.StatusOK
+			server.RouteToHandler("GET", "/api/_ping", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				statusCode := atomic.LoadInt64(&statusCode)
+				resp.WriteHeader(int(statusCode))
+			}))
+
+			args = []string{"-readiness-interval=1s"}
+		})
+
+		AfterEach(func() {
+			session.Kill()
+		})
+
+		It("does not exit until the http server is down", func() {
+			session = httpHealthCheck()
+			Consistently(session).ShouldNot(gexec.Exit())
+			atomic.StoreInt64(&statusCode, http.StatusInternalServerError)
+			Eventually(session, 2*time.Second).Should(gexec.Exit(6))
+			Expect(session.Err).NotTo(gbytes.Say("healthcheck failed"))
+			Expect(session.Err).To(gbytes.Say("Readiness check unsuccessful"))
+			Expect(session.Err).To(gbytes.Say("received status code 500 in"))
+		})
+
+		It("runs a healthcheck every readiness-interval", func() {
 			session = httpHealthCheck()
 			start := time.Now()
 			Eventually(server.ReceivedRequests, 3*time.Second).Should(HaveLen(2))
@@ -220,7 +313,7 @@ var _ = Describe("HealthCheck", func() {
 
 			Context("when the address returns error http code", func() {
 				BeforeEach(func() {
-					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(500, ""))
+					server.RouteToHandler("GET", "/api/_ping", ghttp.RespondWith(http.StatusInternalServerError, ""))
 				})
 
 				itExitsWithCode(httpHealthCheck, 6, "received status code 500 in")
