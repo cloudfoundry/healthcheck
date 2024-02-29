@@ -2,7 +2,7 @@ package healthcheck
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -95,7 +95,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 		// We need to read the request body to prevent extraneous errors in the server.
 		// We could make a HEAD request but there are concerns about servers that may
 		// not implement the RFC correctly.
-		ioutil.ReadAll(resp.Body)
+		io.ReadAll(resp.Body)
 
 		if resp.StatusCode == http.StatusOK {
 			return nil
