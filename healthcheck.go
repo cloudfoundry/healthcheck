@@ -57,6 +57,7 @@ func (h *HealthCheck) PortHealthCheck(ip string) error {
 	addr := ip + ":" + h.port
 	conn, err := net.DialTimeout(h.network, addr, h.timeout)
 	if err == nil {
+		// #nosec G104-  don't check this error because we want to return OK if we were able to connect, closing is not an issue
 		conn.Close()
 		return nil
 	}
@@ -95,6 +96,7 @@ func (h *HealthCheck) HTTPHealthCheck(ip string) error {
 		// We need to read the request body to prevent extraneous errors in the server.
 		// We could make a HEAD request but there are concerns about servers that may
 		// not implement the RFC correctly.
+		// #nosec G104 - as such, ignore errors because we don't care about the body as long as its not there anymore
 		io.ReadAll(resp.Body)
 
 		if resp.StatusCode == http.StatusOK {
